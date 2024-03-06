@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: SimpleLogin API
+  description: |-
+    This is an API specification for the SimpleLogin REST API. 
+  version: "1.0"
+servers:
+  - url: https://app.simplelogin.io/api
+tags:
+  - name: Account
+    description: Account management
+paths:
+  /auth/login:
+    post:
+      summary: Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                device:
+                  type: string
+                  description: Used to create the API Key. Should be humanly readable so user can manage later on the "API Key" page.
+              required:
+                - email
+                - password
+                - device
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  mfa_enabled:
+                    type: boolean
+                  mfa_key:
+                    type: string
+                  api_key:
+                    type: string
+        403:
+          description: FIDO enabled, suggest using API Key instead
+  /auth/mfa:
+    post:
+      summary: 2FA authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mfa_token:
+                  type: string
+                mfa_key:
+                  type: string
+                device:
+                  type: string
+              required:
+                - mfa_token
+                - mfa_key
+                - device
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  api_key:
+                    type: string
+  /auth/facebook:
+    post:
+      summary: Authenticate using Facebook token (deprecated)
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                facebook_token:
+                  type: string
+                device:
+                  type: string
+      responses:
+        200:
+          description: Successful facebook login
+  /auth/google:
+    post:
+      summary: Authenticate using Google token (deprecated)
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                google_token:
+                  type: string
+                device:
+                  type: string
+      responses:
+        200:
+          description: Successful google login
+  /auth/register:
+    post:
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: 200 means user is going to receive an email that contains an activation code
+  /auth/activate:
+    post:
+      summary: Activate new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                code:
+                  type: string
+      responses:
+        200:
+          description: Account is activated. User can login now.
+        400:
+          description: Wrong email, code
+        410:
+          description: Wrong code too many times. User needs to ask for a reactivation.
+  /auth/reactivate:
+    post:
+      summary: Request a new activation code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        200:
+          description: User is going to receive an email that contains the activation code.
+  /auth/forgot_password:
+    post:
+      summary: Request reset password link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        200:
+          description: Always return 200, even if the email doesn't exist. User needs to enter their email correctly.
+  /user_info:
+    get:
+      summary: Get user's information
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  is_premium:
+                    type: boolean
+                  email:
+                    type: string
+                  in_trial:
+                    type: boolean
+                  profile_picture_url:
+                    type: string
+                  max_alias_free_plan:
+                    type: integer
+        401:
+          description: Unauthorized
+    patch:
+      summary: Update user's information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profile_picture:
+                  type: string
+                  description: The profile picture in base64. Setting to `null` remove the current profile picture.
+                name:
+                  type: string
+      responses:
+        200:
+          description: User information updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfoResponse"
+  /stats:
+    get:
+      summary: Get user's stats
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nb_alias:
+                    type: integer
+                  nb_block:
+                    type: integer
+                  nb_forward:
+                    type: integer
+                  nb_reply:
+                    type: integer
+  /sudo:
+    patch:
+      summary: Enable sudo mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        200:
+          description: Sudo mode has been enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        403:
+          description: Error enabling sudo mode
+  /user:
+    delete:
+      summary: Delete the current user
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Account is scheduled to be deleted
+        440:
+          description: Need sudo
+        403:
+          description: Some error occurred
+  /user/cookie_token:
+    get:
+      summary: Get a one time use token to exchange it for a valid cookie
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        403:
+          description: Some error occurred
+  /api_key:
+    post:
+      summary: Create a new API key
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device:
+                  type: string
+      responses:
+        201:
+          description: New API key created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key:
+                    type: string
+        401:
+          description: Unauthorized
+  /logout:
+    get:
+      summary: Log out
+      responses:
+        200:
+          description: Successful operation
+        401:
+          description: Unauthorized
+  
+  /v5/alias/options:
+    get:
+      summary: Get a set of alias options available to the user
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AliasOptionsResponse"
+          
+          
+
+components:
+  schemas:
+    UserInfoResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        is_premium:
+          type: boolean
+        email:
+          type: string
+        in_trial:
+          type: boolean
+        profile_picture_url:
+          type: string
+        max_alias_free_plan:
+          type: integer
+    AliasOptionsResponse:
+      type: object
+      properties:
+        can_create:
+          type: boolean
+          example: true
+        prefix_suggestion:
+          type: string
+          example: "test"
+        suffixes:
+          type: array
+          items:
+            type: object
+            properties:
+              signed_suffix:
+                type: string
+                example: 
+                  signed_suffix: ""
+              suffix:
+                type: string
+                example: ".cat@d1.test"
+              is_custom:
+                type: boolean
+                example: true
+              is_premium:
+                type: boolean
+                example: false
+            example:
+              - signed_suffix: .cat@d1.test.X6_7OQ.0e9NbZHE_bQvuAapT6NdBml9m6Q
+                suffix: .cat@d1.test
+                is_custom: true
+                is_premium: false
+              - signed_suffix: .chat@d2.test.X6_7OQ.TTgCrfqPj7UmlY723YsDTHhkess
+                suffix: .chat@d2.test
+                is_custom: false
+                is_premium: false
+              - signed_suffix: .yeah@sl.local.X6_7OQ.i8XL4xsMsn7dxDEWU8eF-Zap0qo
+                suffix: .yeah@sl.local
+                is_custom: true
+                is_premium: false
+        
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      name: Authentication
+      in: header
+security:
+- ApiKeyAuth: []
